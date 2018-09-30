@@ -1,0 +1,13 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pyzmq = "==17.1.2"
+msgpack = "==0.5.6"
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"
