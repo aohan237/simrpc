@@ -9,9 +9,12 @@ logger = logging.getLogger(__package__)
 
 class SimRpcClient:
     def __init__(self, server_address="tcp://localhost:5559",
-                 is_async=False):
+                 is_async=False, timeout=3000):
         self.is_async = is_async
         self.server_address = server_address
+        self.poll = zmq.Poller()
+        self.async_poll = zmq.asyncio.Poller()
+        self.timeout = timeout
 
     def get_socket(self):
         if self.is_async:
@@ -20,6 +23,7 @@ class SimRpcClient:
             context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect(self.server_address)
+        self.poll.register(socket, zmq.POLLIN)
         return socket
 
     def task(self, response_only: bool = False, func=False):
@@ -47,7 +51,11 @@ class SimRpcClient:
                     socket = self.get_socket()
                     setattr(cls, "socket", socket)
                 socket.send(data)
-                res = socket.recv()
+                socks = dict(self.poll.poll(self.timeout))
+                if socks.get(socket) == zmq.POLLIN:
+                    res = socket.recv()
+                else:
+                    res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
                 return encode_msg(res, response_only=response_only)
 
             @wraps(func)
@@ -71,7 +79,12 @@ class SimRpcClient:
                     socket = self.get_socket()
                     setattr(cls, "socket", socket)
                 await socket.send(data)
-                res = await socket.recv()
+                socks = await self.async_poll.poll(self.timeout)
+                socks = dict(socks)
+                if socks.get(socket) == zmq.POLLIN:
+                    res = await socket.recv()
+                else:
+                    res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
                 return encode_msg(res, response_only=response_only)
 
             if self.is_async:

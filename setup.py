@@ -82,6 +82,7 @@ with open(os.path.join(here, PACKAGE, '__init__.py')) as meta_fh:
             if m:
                 meta.update(handler(m))
 
+print(meta)
 # -*- Installation Requires -*-
 
 
