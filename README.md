@@ -1,5 +1,7 @@
 # SimRpc
 
+[![Downloads](https://pepy.tech/badge/simrpc)](https://pepy.tech/project/simrpc)
+
 ## Why SimRpc
 
 all of the popular rpc framework today, is fast and stable.
