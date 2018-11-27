@@ -123,7 +123,9 @@ settings = {
     }
 }
 service = a()
-server.register_with_init(a, settings=settings)
+server.register(service)
+# or you can have this class init with server
+# server.register_with_init(cls_list=[a], settings=settings)
 ```
 
 #### 3) start your rpc server broker

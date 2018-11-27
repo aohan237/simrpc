@@ -47,7 +47,11 @@ class SimRpcServer:
             cls_list = []
         for cls in cls_list:
             try:
-                cls_settings = settings.get(cls.__name__, {})
+                try:
+                    name = cls.__name__
+                except:
+                    name = cls.__class__.__name__
+                cls_settings = settings.get(name, {})
                 instance = cls(*cls_settings.get("args", ()),
                                **cls_settings.get("kwargs", {}))
             except Exception as tmp:
