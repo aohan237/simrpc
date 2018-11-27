@@ -8,6 +8,7 @@ from zmq.asyncio import Context
 from .message import encode_msg, decode_msg_body
 
 logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 class SimRpcServer:
@@ -35,9 +36,15 @@ class SimRpcServer:
         if name == "function":
             self.data[instance.__name__] = instance
         else:
+            try:
+                name = instance.__name__
+            except:
+                name = instance.__class__.__name__
             self.data[name] = instance
 
-    def register_with_init(self, *args, cls_list=None, settings=None, **kwargs):
+    def register_with_init(self, cls_list=None, settings=None):
+        if cls_list is None:
+            cls_list = []
         for cls in cls_list:
             try:
                 cls_settings = settings.get(cls.__name__, {})
@@ -111,19 +118,23 @@ class SimRpcServer:
         self.executor.submit(self.period_actor)
         num_thread = 4 if self.async_task else 20
         for i in range(num_thread):
-            t = self.executor.submit(self.actor)
+            self.executor.submit(self.actor)
         while True:
-            logger.info("check heathy status")
-            dead_thread = set()
-            for thread in self.executor._threads:
-                if not thread.is_alive():
+            try:
+                logger.info("check heathy status")
+                dead_thread = set()
+                for thread in self.executor._threads:
+                    if not thread.is_alive():
+                        thread._tstate_lock.release()
+                        dead_thread.add(thread)
+                self.executor._threads -= dead_thread
+                for i in range(len(dead_thread)):
+                    self.executor.submit(self.actor)
+                time.sleep(300)
+            except KeyboardInterrupt:
+                for thread in self.executor._threads:
                     thread._tstate_lock.release()
-                    thread.stop()
-                    dead_thread.add(thread)
-            self.executor._threads -= dead_thread
-            for i in range(len(dead_thread)):
-                t = self.executor.submit(self.actor)
-            time.sleep(300)
+                break
 
     def start_broker(self):
         self.executor.submit(self.zmq_device)
@@ -152,7 +163,6 @@ class SimRpcServer:
         while True:
             #  Wait for next request from client
             message = await socket.recv()
-            # print(message)
             try:
                 message = await self.async_dispatch(message)
             except Exception as tmp:

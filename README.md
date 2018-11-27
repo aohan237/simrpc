@@ -79,6 +79,11 @@ def add(x, y):
 
 #### 3) Use these functions as usual
 
+```python
+a().minus(4,5,rpc_client=True)
+```
+**you must point it out this a rpc client(as use rpc_client=True prameter), otherwise will use local code**
+
 ### Server Side
 
 #### 1) start an server instance

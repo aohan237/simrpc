@@ -3,6 +3,7 @@ import uuid
 import logging
 
 logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 def decode_msg(service=None, entry=None, args=None, kwargs=None):

@@ -1,10 +1,12 @@
 import zmq
 import logging
+import types
 from functools import wraps
 from zmq.asyncio import Context
 from .message import decode_msg, encode_msg
 
 logger = logging.getLogger(__package__)
+logger.setLevel(logging.INFO)
 
 
 class SimRpcClient:
@@ -39,24 +41,36 @@ class SimRpcClient:
                     args = args[1:]
                 else:
                     cls = func
-                data = decode_msg(
-                    service=cls.__class__.__name__ if cls else "",
-                    entry=func.__name__,
-                    args=args,
-                    kwargs=kwargs
-                )
-                if hasattr(cls, "socket"):
-                    socket = getattr(cls, "socket")
+                client = kwargs.pop('rpc_client', False)
+                if client:
+                    data = decode_msg(
+                        service=cls.__class__.__name__ if cls else "",
+                        entry=func.__name__,
+                        args=args,
+                        kwargs=kwargs
+                    )
+                    if hasattr(cls, "socket"):
+                        socket = getattr(cls, "socket")
+                    else:
+                        socket = self.get_socket()
+                        setattr(cls, "socket", socket)
+                    try:
+                        socket.send(data)
+                    except Exception as tmp:
+                        print("send_error", tmp)
+                    socks = dict(self.poll.poll(self.timeout))
+                    if socks.get(socket) == zmq.POLLIN:
+                        res = socket.recv()
+                    else:
+                        res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
+                    return encode_msg(res, response_only=response_only)
                 else:
-                    socket = self.get_socket()
-                    setattr(cls, "socket", socket)
-                socket.send(data)
-                socks = dict(self.poll.poll(self.timeout))
-                if socks.get(socket) == zmq.POLLIN:
-                    res = socket.recv()
-                else:
-                    res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
-                return encode_msg(res, response_only=response_only)
+                    qual_name = func.__qualname__.split('.')
+                    if len(qual_name) > 1:
+                        return func(cls, *args, **kwargs)
+                    else:
+                        print(func, isinstance(func, types.MethodType))
+                        return func(*args, **kwargs)
 
             @wraps(func)
             async def async_wrapper(*args, **kwargs):
@@ -67,25 +81,33 @@ class SimRpcClient:
                     args = args[1:]
                 else:
                     cls = func
-                data = decode_msg(
-                    service=cls.__class__.__name__ if cls else "",
-                    entry=func.__name__,
-                    args=args,
-                    kwargs=kwargs
-                )
-                if hasattr(cls, "socket"):
-                    socket = getattr(cls, "socket")
+                client = kwargs.get('client', False)
+                if client:
+                    data = decode_msg(
+                        service=cls.__class__.__name__ if cls else "",
+                        entry=func.__name__,
+                        args=args,
+                        kwargs=kwargs
+                    )
+                    if hasattr(cls, "socket"):
+                        socket = getattr(cls, "socket")
+                    else:
+                        socket = self.get_socket()
+                        setattr(cls, "socket", socket)
+                    await socket.send(data)
+                    socks = await self.async_poll.poll(self.timeout)
+                    socks = dict(socks)
+                    if socks.get(socket) == zmq.POLLIN:
+                        res = await socket.recv()
+                    else:
+                        res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
+                    return encode_msg(res, response_only=response_only)
                 else:
-                    socket = self.get_socket()
-                    setattr(cls, "socket", socket)
-                await socket.send(data)
-                socks = await self.async_poll.poll(self.timeout)
-                socks = dict(socks)
-                if socks.get(socket) == zmq.POLLIN:
-                    res = await socket.recv()
-                else:
-                    res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
-                return encode_msg(res, response_only=response_only)
+                    qual_name = func.__qualname__.split('.')
+                    if len(qual_name) > 1:
+                        return await func(cls, *args, **kwargs)
+                    else:
+                        return await func(*args, **kwargs)
 
             if self.is_async:
                 return async_wrapper
