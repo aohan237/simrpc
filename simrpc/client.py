@@ -34,7 +34,10 @@ class SimRpcClient:
 
             @wraps(func)
             def wrapper(*args, **kwargs):
-                cls = args[0]
+                if len(args) > 0:
+                    cls = args[0]
+                else:
+                    cls = func
                 if hasattr(cls, "__module__") and \
                         cls.__class__.__name__ != "function":
                     cls = args[0]
