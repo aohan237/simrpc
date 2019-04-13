@@ -20,6 +20,8 @@ class SimRpcServer:
         worker_address="tcp://localhost:5560",
         max_workers=30,
         period_task_name="period_tasks",
+        need_monitor=False,
+        monitor_cls=None,
     ):
         self.data = {}
         self.max_workers = max_workers
@@ -30,6 +32,8 @@ class SimRpcServer:
         self.worker_address = worker_address
         self.async_task = async_task
         self.period_task_name = period_task_name
+        self.need_monitor = need_monitor
+        self.monitor_cls = monitor_cls
 
     def register(self, instance):
         name = instance.__class__.__name__
@@ -150,29 +154,42 @@ class SimRpcServer:
         context = zmq.Context()
         socket = context.socket(zmq.REP)
         socket.connect(self.worker_address)
+        if self.need_monitor:
+            my_monitor = self.monitor_cls()
+            my_monitor.prepare()
         while True:
             #  Wait for next request from client
             message = socket.recv()
             try:
-                message = self.dispatch(message)
+                res_message = self.dispatch(message)
             except Exception as tmp:
-                message = ""
+                res_message = ""
                 logger.exception(tmp)
-            socket.send(message)
+            socket.send(res_message)
+            if self.need_monitor:
+                data = {'req': message, 'rep': res_message}
+                my_monitor.receive(data)
 
     async def async_tasks(self):
         context = Context()
         socket = context.socket(zmq.REP)
         socket.connect(self.worker_address)
+        loop = asyncio.get_event_loop()
+        if self.need_monitor:
+            my_monitor = self.monitor_cls()
+            await my_monitor.prepare()
         while True:
             #  Wait for next request from client
             message = await socket.recv()
             try:
-                message = await self.async_dispatch(message)
+                res_message = await self.async_dispatch(message)
             except Exception as tmp:
-                message = ""
+                res_message = ""
                 logger.exception(tmp)
-            await socket.send(message)
+            await socket.send(res_message)
+            if self.need_monitor:
+                data = {'req': message, 'rep': res_message}
+                loop.create_task(my_monitor.receive(data))
 
     def actor(self):
         if self.async_task:
