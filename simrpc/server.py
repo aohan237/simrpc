@@ -36,6 +36,12 @@ class SimRpcServer:
         self.monitor_cls = monitor_cls
 
     def register(self, instance):
+        """
+        if you want to register a cls with async, and want to have init async connect:
+            you have to add a "ready" property to show init connect statu,
+            and must have a async prepare function to do this init connect,
+            when prepare is done ,you must change ready to True state.
+        """
         name = instance.__class__.__name__
         if name == "function":
             self.data[instance.__name__] = instance
@@ -47,6 +53,12 @@ class SimRpcServer:
             self.data[name] = instance
 
     def register_with_init(self, cls_list=None, settings=None):
+        """
+        if you want to register a cls with async, and want to have init async connect:
+            you have to add a "ready" property to show init connect statu,
+            and must have a async prepare function to do this init connect,
+            when prepare is done ,you must change ready to True state.
+        """
         if cls_list is None:
             cls_list = []
         for cls in cls_list:
@@ -110,6 +122,10 @@ class SimRpcServer:
             entry = self.data.get(entry)
         else:
             instance = self.data.get(service)
+            if hasattr(instance, 'ready'):
+                if not getattr(instance, 'ready'):
+                    prepare_func = getattr(instance, 'prepare')
+                    await prepare_func()
             if instance and hasattr(instance, entry):
                 entry = getattr(instance, entry)
         if callable(entry):
