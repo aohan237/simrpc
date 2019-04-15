@@ -6,7 +6,8 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from zmq.asyncio import Context
 from .message import encode_msg, decode_msg_body
-
+from threading import local
+from copy import deepcopy
 logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
 
@@ -24,6 +25,7 @@ class SimRpcServer:
         monitor_cls=None,
     ):
         self.data = {}
+        self.data_local = local()
         self.max_workers = max_workers
         self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         self.thread_tasks = set()
@@ -119,9 +121,9 @@ class SimRpcServer:
         service = message['service']
         entry = message['entry']
         if service == "function":
-            entry = self.data.get(entry)
+            entry = self.data_local.data.get(entry)
         else:
-            instance = self.data.get(service)
+            instance = self.data_local.data.get(service)
             if hasattr(instance, 'ready'):
                 if not getattr(instance, 'ready'):
                     prepare_func = getattr(instance, 'prepare')
@@ -170,6 +172,10 @@ class SimRpcServer:
         context = zmq.Context()
         socket = context.socket(zmq.REP)
         socket.connect(self.worker_address)
+
+        # copy data to thread local
+        self.data_local.data = deepcopy(self.data)
+
         if self.need_monitor:
             my_monitor = self.monitor_cls()
             my_monitor.prepare()
@@ -191,6 +197,9 @@ class SimRpcServer:
         socket = context.socket(zmq.REP)
         socket.connect(self.worker_address)
         loop = asyncio.get_event_loop()
+        # copy data to thread local
+        self.data_local.data = deepcopy(self.data)
+
         if self.need_monitor:
             my_monitor = self.monitor_cls()
             await my_monitor.prepare()
@@ -217,9 +226,12 @@ class SimRpcServer:
             self.tasks()
 
     def period_actor(self):
+        # copy data to thread local
+        self.data_local.data = deepcopy(self.data)
+
         if self.async_task:
             tasks = []
-            for obj in self.data.values():
+            for obj in self.data_local.data.values():
                 if obj.__class__.__name__ != "function":
                     if hasattr(obj, self.period_task_name):
                         tt = getattr(obj, self.period_task_name)()
