@@ -103,6 +103,7 @@ class SimRpcClient:
                     if socks.get(socket) == zmq.POLLIN:
                         res = await socket.recv()
                     else:
+                        await socket.recv()
                         res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
                     return encode_msg(res, response_only=response_only)
                 else:

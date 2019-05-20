@@ -1,4 +1,4 @@
-__version__ = '1.2.6'
+__version__ = '1.2.7'
 __author__ = 'aohan237'
 __contact__ = 'aohan237@gmail.com'
 __homepage__ = 'https://github.com/aohan237/simrpc'
