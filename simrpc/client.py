@@ -6,7 +6,6 @@ from zmq.asyncio import Context
 from .message import decode_msg, encode_msg, MsgPack
 
 logger = logging.getLogger(__package__)
-logger.setLevel(logging.INFO)
 
 
 class SimRpcClient:
