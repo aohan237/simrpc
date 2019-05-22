@@ -3,7 +3,7 @@ import logging
 import types
 from functools import wraps
 from zmq.asyncio import Context
-from .message import decode_msg, encode_msg
+from .message import decode_msg, encode_msg, MsgPack
 
 logger = logging.getLogger(__package__)
 logger.setLevel(logging.INFO)
@@ -11,12 +11,14 @@ logger.setLevel(logging.INFO)
 
 class SimRpcClient:
     def __init__(self, server_address="tcp://localhost:5559",
-                 is_async=False, timeout=3000):
+                 is_async=False, timeout=3000, msg_tool=None):
         self.is_async = is_async
         self.server_address = server_address
         self.poll = zmq.Poller()
         self.async_poll = zmq.asyncio.Poller()
         self.timeout = timeout
+        msg_tool = msg_tool or MsgPack
+        self.msg_tool = msg_tool()
 
     def get_socket(self):
         if self.is_async:
@@ -66,7 +68,7 @@ class SimRpcClient:
                         res = socket.recv()
                     else:
                         res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
-                    return encode_msg(res, response_only=response_only)
+                    return self.msg_tool.encode_msg(res, response_only=response_only)
                 else:
                     qual_name = func.__qualname__.split('.')
                     if len(qual_name) > 1:
@@ -86,7 +88,7 @@ class SimRpcClient:
                     cls = func
                 client = kwargs.get('client', False)
                 if client:
-                    data = decode_msg(
+                    data = self.msg_tool.decode_msg(
                         service=cls.__class__.__name__ if cls else "",
                         entry=func.__name__,
                         args=args,
@@ -105,7 +107,7 @@ class SimRpcClient:
                     else:
                         await socket.recv()
                         res = b'\x82\xa8response\xc0\xa3msg\xa7timeout'
-                    return encode_msg(res, response_only=response_only)
+                    return self.msg_tool.encode_msg(res, response_only=response_only)
                 else:
                     qual_name = func.__qualname__.split('.')
                     if len(qual_name) > 1:

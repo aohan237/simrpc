@@ -5,11 +5,10 @@ import inspect
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from zmq.asyncio import Context
-from .message import encode_msg, decode_msg_body
+from .message import MsgPack
 from threading import local
 from copy import deepcopy
 logger = logging.getLogger(__package__)
-logger.setLevel(logging.INFO)
 
 
 class SimRpcServer:
@@ -23,6 +22,7 @@ class SimRpcServer:
         period_task_name="period_tasks",
         need_monitor=False,
         monitor_cls=None,
+        msg_tool=None
     ):
         self.data = {}
         self.data_local = local()
@@ -36,6 +36,8 @@ class SimRpcServer:
         self.period_task_name = period_task_name
         self.need_monitor = need_monitor
         self.monitor_cls = monitor_cls
+        msg_tool = msg_tool or MsgPack
+        self.msg_tool = msg_tool()
 
     def register(self, instance):
         """
@@ -100,7 +102,7 @@ class SimRpcServer:
                 context.term()
 
     def dispatch(self, message):
-        message = encode_msg(message)
+        message = self.msg_tool.encode_msg(message)
         service = message['service']
         entry = message['entry']
         if service == "function":
@@ -113,11 +115,11 @@ class SimRpcServer:
             result = entry(*message['args'], **message['kwargs'])
         else:
             result = None
-        message = decode_msg_body({"response": result})
+        message = self.msg_tool.decode_msg_body({"response": result})
         return message
 
     async def async_dispatch(self, message):
-        message = encode_msg(message)
+        message = self.msg_tool.encode_msg(message)
         service = message['service']
         entry = message['entry']
         if service == "function":
@@ -136,7 +138,7 @@ class SimRpcServer:
                 result = await result
         else:
             result = None
-        message = decode_msg_body({"response": result})
+        message = self.msg_tool.decode_msg_body({"response": result})
         return message
 
     def thread_run(self):
