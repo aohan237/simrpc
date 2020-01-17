@@ -3,7 +3,7 @@ import logging
 import types
 from functools import wraps
 from zmq.asyncio import Context
-from .message import decode_msg, encode_msg, MsgPack
+from .message import MsgPack
 
 logger = logging.getLogger(__package__)
 
@@ -47,7 +47,7 @@ class SimRpcClient:
                     cls = func
                 client = kwargs.pop('rpc_client', False)
                 if client:
-                    data = decode_msg(
+                    data = self.msg_tool.decode_msg(
                         service=cls.__class__.__name__ if cls else "",
                         entry=func.__name__,
                         args=args,
